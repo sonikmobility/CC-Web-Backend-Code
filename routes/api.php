@@ -132,7 +132,6 @@ Route::group(['middleware' => 'auth:sanctum', 'ability:admin,super-admin'], func
     Route::post('add-charger', [ApiChargerController::class, 'addCharger']);
     Route::post('get-api-charger-id', [ChargerController::class, 'getChargerById']);
     Route::post('get-charger-by-id', [ChargerController::class, 'getCharger']);
-    Route::post('get-near-by-charger', [ChargerController::class, 'getNearByCharger']);
     Route::get('get-all-charger', [ChargerController::class, 'getAllCharger']);
 
     // Use In Web
@@ -292,7 +291,6 @@ Route::group(['middleware' => 'auth:sanctum', 'ability:admin,super-admin'], func
     Route::post('delete-report-title', [UserReportController::class, 'deleteReportTitle']);
 
     // Banner Route
-    Route::post('get-banner', [BannerController::class, 'getBanner']);
     Route::post('get-web-banner', [AdminBannerController::class, 'getWebBanner']);
     Route::post('show-banner', [AdminBannerController::class, 'showBanner']);
     Route::post('store-or-update-benner-web', [AdminBannerController::class, 'storeOrUpdateBannerWeb']);
@@ -331,6 +329,8 @@ Route::group(['middleware' => 'auth:sanctum', 'ability:admin,super-admin'], func
     Route::post('phonepe/check-transaction-status', [TransactionController::class, 'checkTransactionStatus']);
 });
 
+Route::post('get-near-by-charger', [ChargerController::class, 'getNearByCharger']);
+Route::post('get-banner', [BannerController::class, 'getBanner']);
 Route::post('phonepe/handle-callback', [TransactionController::class, 'phonePeCallBack']);
 
 //Route::apiResource('users', UserController::class)->except(['edit', 'create', 'store', 'update'])->middleware(['auth:sanctum', 'ability:admin,super-admin']);
