@@ -14,7 +14,7 @@ class BannerController extends Controller
 {
     public function getBanner(){
         $success = true;
-        $get_banner = Banner::where('status', 33)->get();
+        $get_banner = Banner::where('status', 1)->get();
         
         if ($get_banner->isEmpty()) {
             $code = config('constant.UNSUCCESS');
