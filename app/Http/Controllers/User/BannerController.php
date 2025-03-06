@@ -13,16 +13,15 @@ use Illuminate\Support\Facades\File;
 class BannerController extends Controller
 {
     public function getBanner(){
-        $user_exist = auth('sanctum')->user();
-        $get_banner = [];
         $success = true;
-        if(!blank($user_exist)){
-            $get_banner = Banner::where('status',1)->get();
-            $code = config('constant.SUCCESS');
-            $msg = "Get banner Successfully";
-        }else {
+        $get_banner = Banner::where('status', 33)->get();
+        
+        if ($get_banner->isEmpty()) {
             $code = config('constant.UNSUCCESS');
-            $msg = "User Not Found";
+            $msg = "No banners found";
+        } else {
+            $code = config('constant.SUCCESS');
+            $msg = "Banners fetched successfully";
         }
         return response()->json(['code' => $code, 'success' => $success, 'msg' => $msg, 'result'=> $get_banner]);
     }
