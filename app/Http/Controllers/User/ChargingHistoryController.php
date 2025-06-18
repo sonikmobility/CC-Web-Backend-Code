@@ -148,4 +148,6 @@ class ChargingHistoryController extends Controller
         }
         return response(array('code' => $code, 'success' => $success, 'msg' => $msg, 'result' => $result));
     }
+
+    
 }
