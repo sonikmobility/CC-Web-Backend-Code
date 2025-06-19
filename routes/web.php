@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ChargingHistoryController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\UserController;
@@ -54,7 +55,7 @@ Route::get('/download-all-user-transactions-data/{startDate?}/{endDate?}', [User
 
 
 // Download Charging history data
-Route::get('/download-charging-history-data/{startDate?}/{endDate?}', );
+Route::get('/download-charging-history-data/{startDate?}/{endDate?}', [ChargingHistoryController::class,'allChargingHistoryExport']);
 
 // Download Wallet Histories Data
 
