@@ -1,182 +1,237 @@
 pipeline {
+    //agent any
     agent { 
         // # JENKINS AGENT (BUILD SERVER)
         label 'Jenkins-Agent-1_QL_DEV-Server'
     }
-
     options {
-        // # Setting timeout option to abort the build automatically if the build get's stuck
         timeout(time: 45, unit: 'MINUTES')
+        //disableConcurrentBuilds()
     }
-    
+    //tools {
+    //    sonarqube scanner 'SonarScanner_V6.2.1.4610'
+    //}
     environment {
-        SCANNER_HOME = tool 'SonarQubeScanner-V4.8.0.2856'
-
-        WEBHOOK_URL = "https://quokkalabsllp.webhook.office.com/webhookb2/0790c749-18af-46ec-a453-e568cda0ba52@4821c368-51a8-493c-92ea-826dd01a89cc/JenkinsCI/00758520ae9745d3bb7f39673a7fc16b/05fbe5b2-8efd-4b4d-bf06-59990f3b2907"
-        COLOUR_SUCCCESS = "#7B83EB" //Medium Slate Blue 
-        COLOUR_FAILURE = "#FFB316" //Spanish Yellow
-        
-        WDIR = "/jenkins-pipelines/${JOB_NAME}"
-        BRANCHH = "development"
-        TARGET_BRANCHH = "${CHANGE_TARGET}"
-
-        REPO_OWNER = "automation-quokkalabs"
-        REPO_NAME = "adapt-sti-flutter"
-        GITHUB_TOKEN_ID = "github_automation-quokkalabs"
-        PROJECT_NAME = "adapt-sti-flutter"
-        WS_DIR = "${WDIR}/${PROJECT_NAME}"
+        //------------------------------------------------
+        PR_TARGET_BRANCH = "${CHANGE_TARGET}"
+        PR_SOURCE_BRANCH = "${CHANGE_BRANCH}"
+        //------------------------------------------------
+        WS_DIR = "/jenkins-pipelines/${JOB_NAME}"
+        JENKINS_JOB_NAME = "${env.JOB_NAME.split('/')[1]}"
+        SEND_MSTEAMS_NOTIFICATIONS = '0'        
+        //------------------------------------------------
     }
-
     stages {
-        stage('SCM') {
-        // # Pulling code from SCM
-            when {
-                expression {
-                    targetbrachconfirm()
-                }
+        stage('PreStage - Initialize WorkSpace & SCM') {
+            environment {
+                REPO_NAME = sh(script: "basename -s .git ${env.GIT_URL}", returnStdout: true).trim()
             }
-            steps{
-                sh "mkdir -p ${WS_DIR}"
-                dir ("${WS_DIR}") {
-                    checkout scm
+            steps {
+                script {
+                    def allowedBranches = ['main', 'master', 'staging', 'stage']
+                    //def allowedBranches = ['main', 'master', 'staging', 'stage', 'development', 'develop']
+                    // Validate Job Name
+                    if (env.JENKINS_JOB_NAME != "${REPO_NAME}") {
+                        error "Job Name (${env.JENKINS_JOB_NAME}) does not match Repository Name (${REPO_NAME})!"
+                    }                    
+                    // Validate the target branch
+                    if (!allowedBranches.contains(PR_TARGET_BRANCH)) {
+                        error "Branch '${PR_TARGET_BRANCH}' is not allowed. Exiting the pipeline."
+                    } 
+                    // Checkout the source code
+                    sh "mkdir -p ${WS_DIR} || true"
+                    echo "Checking out branch: ${PR_TARGET_BRANCH} from ${PR_SOURCE_BRANCH}"
+                    dir("${WS_DIR}") {
+                        checkout scm
+                    }
                 }
             }
         }
-
-        stage("SonarQube Analysis") {
-        // # Performing Code Quality Check in jenkins agent's workspace
-            when {
-                expression {
-                    targetbrachconfirm()
-                }
+/*        stage("OWASP Dependency Check Analysis") {
+            environment {
+                REPO_NAME = sh(script: "basename -s .git ${env.GIT_URL}", returnStdout: true).trim()
+                DEP_CHECK_IMAGE = "owasp/dependency-check:latest"
+                DEP_CHECK_DATA_DIR = "/data/security-tools_data/owasp/dependency-check/data"
             }
             steps {
-                dir ("${WS_DIR}") {
-                    withCredentials([string(credentialsId: 'ql-sonarqube-server-token', variable: 'SonarToken'), string(credentialsId: 'ql-sonarqube-global-webhook', variable: 'SonarWebHook')]) {
-                        withSonarQubeEnv(installationName: 'QL-SONARQUBE-SERVER', credentialsId: 'ql-sonarqube-server-token') {
-                            sh ''' $SCANNER_HOME/bin/sonar-scanner \
-                                -Dsonar.projectKey=$PROJECT_NAME \
-                                -Dsonar.java.binaries=build/classes/java/ \
-                                -Dsonar.sources=.
-                            '''
-                            //-Dsonar.java.binaries=. \
-                            //-Dsonar.exclusions=$EXCLUSION \
+                script {
+                    dir ("${WS_DIR}") {
+                        sh """
+                        mkdir -p ${WS_DIR}/dependency-check-reports
+                        docker run --rm --name owasp-dependency-check_${UUID.randomUUID().toString().take(8)} \
+                            -v ${DEP_CHECK_DATA_DIR}:/usr/share/dependency-check/data \
+                            -v ${WS_DIR}:/src \
+                            -v ${WS_DIR}/dependency-check-reports:/report \
+                            -v ${DEP_CHECK_DATA_DIR}/mysql-connector-j-9.1.0.jar:/usr/share/dependency-check/lib/mysql-connector-j-9.1.0.jar \
+                            ${DEP_CHECK_IMAGE} \
+                            --scan /src \
+                            --format ALL \
+                            --out /report \
+                            --project "${REPO_NAME}" \
+                            --dbDriverPath "/usr/share/dependency-check/lib/mysql-connector-j-9.1.0.jar" \
+                            --propertyfile "/usr/share/dependency-check/data/dependency-check_client.properties" \
+                            --noupdate \
+                            --prettyPrint
+                        """
+                    }
+                    sh "exit 0"
+                }
+            }
+        }
+*/        stage("SonarQube Analysis") { 
+            environment {
+                REPO_NAME = sh(script: "basename -s .git ${env.GIT_URL}", returnStdout: true).trim()
+                SONARSCANNER_IMAGE = "sonarsource/sonar-scanner-cli:latest"
+                SONARSCANNER_DATA_DIR = "/data/security-tools_data/sonar/sonarscanner-cli/.sonar"
+            }
+            steps { 
+                script {
+                    dir ("${WS_DIR}") {
+                        withSonarQubeEnv('QL-SONARQUBE-SERVER') {
+                            //REPO_NAME = sh(script: "basename -s .git ${env.GIT_URL}", returnStdout: true).trim()
+                            //sh "echo ${REPO_NAME}"
+                            withCredentials([
+                                string(credentialsId: 'SONARQUBE_SERVER_URL_QL', variable: 'SONARQUBE_SERVER_URL'), 
+                                string(credentialsId: 'SONAR-TOKEN_ql-jenkins', variable: 'SONARQUBE_TOKEN')
+                            ]) {
+                                sh """
+                                set -x
+                                sudo mkdir -p ${WS_DIR}/.scannerwork && sudo chmod 777 -R ${WS_DIR}/.scannerwork
+                                sudo rm -rf ${WS_DIR}/sonarscan-output.log || true
+                                docker run --rm --name sonar-scanner_${UUID.randomUUID().toString().take(8)} \
+                                    -v ${WS_DIR}:/usr/src \
+                                    -v ${SONARSCANNER_DATA_DIR}/.sonar:/opt/sonar-scanner/.sonar \
+                                    -v ${WS_DIR}/.scannerwork:/usr/src/.scannerwork \
+                                    ${SONAR_SCANNER_IMAGE} \
+                                    sh -c "mkdir -p /usr/src/.scannerwork && \
+                                    sonar-scanner -X \
+                                    -Dsonar.java.binaries=build/classes/java/ \
+                                    -Dsonar.projectKey=${REPO_NAME} \
+                                    -Dsonar.host.url=$SONAR_SERVER_URL \
+                                    -Dsonar.login=$SONARQUBE_TOKEN \
+                                    -Dsonar.sources=/usr/src \
+                                    -Dsonar.working.directory=/usr/src/.scannerwork \
+                                    -Dsonar.dependencyCheck.jsonReportPath=/usr/src/dependency-check-reports/dependency-check-report.json \
+                                    -Dsonar.dependencyCheck.xmlReportPath=/usr/src/dependency-check-reports/dependency-check-report.xml \
+                                    -Dsonar.dependencyCheck.htmlReportPath=/usr/src/dependency-check-reports/dependency-check-report.html \
+                                    -Dsonar.exclusions=**/.scannerwork/**,**/dependency-check-reports/**,**/node_modules/**,**/dist/**,**/build/** \
+                                    -Dsonar.verbose=true > /usr/src/sonarscan-output.log"
+                                sudo chmod 777 ${WS_DIR}/sonarscan-output.log
+                            """
+                            echo "Sonar Scanning successful. You can find the scan log at : ${WS_DIR}/sonarscan-output.log"
+                            }
+                        }
+                    }
+                }
+            } 
+        }
+        stage("SonarQube Quality Gate") {
+            steps {
+                //ansiColor('xterm') {
+                withCredentials([
+                    string(credentialsId: 'SONAR-TOKEN_ql-jenkins', variable: 'SONARQUBE_TOKEN')
+                ]) {
+                    script {
+                        //timeout(time: 1, unit: 'HOURS') {
+                        timeout(time: 10, unit: 'MINUTES') {
+                            def taskId = sh(script: "grep -oP 'task\\?id=\\K[^ ]+' ${WS_DIR}/sonarscan-output.log", returnStdout: true).trim()
+                            echo "Task ID: ${taskId}"
+                            def taskUrl = "${SONAR_SERVER_URL}/api/ce/task?id=${taskId}"
+                            echo "Task URL: ${taskUrl}"
+                            //def jsonSlurper = new groovy.json.JsonSlurper().parseText(response)
+                            //def parsedResponse = jsonSlurper.parseText(response)
+                            //def status = parsedResponse.task.status
+                            //echo "Status: ${status}"
+                            def taskStatus = ''
+                            while (taskStatus != "SUCCESS" && taskStatus != "FAILED") {
+                                sleep 30 // Wait for <> seconds before polling
+                                def response = sh(script: "curl -s -u $SONARQUBE_TOKEN: ${taskUrl}", returnStdout: true).trim()
+                                echo "SonarQube API Response: ${response}"
+                                def json = readJSON text: response
+                                taskStatus = json?.task?.status ?: 'PENDING'
+                                echo "Current Task Status: ${taskStatus}"
+                                if (taskStatus == "CANCELED" || taskStatus == "FAILED") {
+                                    error "SonarQube task did not complete successfully. Status: ${taskStatus}"
+                                }
+                            }
+                            if (taskStatus == "SUCCESS") {
+                                echo "SonarQube analysis completed successfully."
+                            }
                         }
                     }
                 }
             }
         }
-
-        stage("SonarQube QualityGate") {
-        // # Waiting for Code Quality Check Response from the Quality Gate Server
-            when {
-                expression {
-                    targetbrachconfirm()
-                }
-            }
-
-            steps {
-                dir ("${WS_DIR}") {
-                    withCredentials([string(credentialsId: 'ql-sonarqube-server-token', variable: 'SonarToken'), string(credentialsId: 'ql-sonarqube-global-webhook', variable: 'SonarWebHook')]) {
-                        waitForQualityGate (abortPipeline: false, credentialsId: 'ql-sonarqube-server-token', webhookSecretId: 'ql-sonarqube-global-webhook')
-                    }
-                }
-            }
-
-           post {
-                always {
-                    // # Clean Workspace inside Jenkins Agent () if build fails.
-                    cleanWs deleteDirs: true, disableDeferredWipeout: false, notFailBuild: true
-                    script {
-                        sh "rm -rf ${WDIR}"
-                    }
-                }
-            }
-        }
-
     }
-
     post {
         // # Executes below commands in JENKINS AGENT (DEPLOYMENT SERVER) if build success
         success {
-            // # Clean Workspace inside Jenkins Agent () if build fails.
-            cleanWs deleteDirs: true, disableDeferredWipeout: false, notFailBuild: true
-
+            /// Define allowed branches in a script block
             script {
-                sh "rm -rf ${WDIR}"
-            }
-
-            script {
-                if ("${TARGET_BRANCHH}" == "${BRANCHH}") {
-                    // # Sends out the notification to MSTeams channel about the build 
-                    office365ConnectorSend webhookUrl: "${WEBHOOK_URL}",
-                        color : "${COLOUR_SUCCCESS}",
-                        status: "${currentBuild.currentResult}",
-                        message: "Sonar Code Scanning for the project - ${env.JOB_NAME} is successfully"
+                withCredentials([                    
+                    string(credentialsId: 'WEBHOOK_MSTEAMS_CICD_CHANNEL', variable: 'WEBHOOK_MSTEAMS_CICD_CHANNEL'),
+                    string(credentialsId: 'MSTEAMS_NOTIFICATION_CICD_PR_COLOUR_CODE_SUCCESS', variable: 'MSTEAMS_NOTIFICATION_CICD_PR_COLOUR_CODE_SUCCESS')
+                ]) {
+                    def allowedBranches = ['main', 'master', 'staging', 'stage']
+                    //def allowedBranches = ['main', 'master', 'staging', 'stage', 'development', 'develop']
+                    echo "Checking target branch: ${PR_TARGET_BRANCH}"
+                    echo "Allowed branches: ${allowedBranches}"
+                    // Only send notification if the branch is allowed
+                    if (allowedBranches.contains(PR_TARGET_BRANCH)) {
+                        if ("${SEND_MSTEAMS_NOTIFICATIONS}" == '1') {
+                            office365ConnectorSend(
+                                webhookUrl: "$WEBHOOK_MSTEAMS_CICD_CHANNEL",
+                                color: "$MSTEAMS_NOTIFICATION_CICD_PR_COLOUR_CODE_SUCCESS",
+                                status: "${currentBuild.currentResult}",
+                                message: "SonarQube analysis for ${env.JOB_NAME} passed successfully." 
+                            )
+                        } else {
+                            echo "MS-TEAMS notification is disabled, Notification on SUCCESS is not sent to MS-Teams (CICD Notifications Channel)"
+                        }
+                    } else {
+                        echo "Skipping Teams notification due to branch mismatch."
                     }
-                else {
-                    sh 'echo "Teams Notification cannot not be sent as PR target branch mismatch"'
                 }
             }
-
-            // # Sends out the notification through e-mails about the build
-            //emailext to: 'ananda.yashaswi@quokkalabs.com, prem.shankar@quokkalabs.com, aman.patel@quokkalabs.com, shashank.tripathi@quokkalabs.com, nisha.rana@quokkalabs.com', 
-                     // to: 'techteam@quokkalabs.com',
-                     // recipientProviders: [buildUser(), contributor(), developers(), requestor(), upstreamDevelopers()],
-                     //subject: "Jenkins build for ${env.JOB_NAME} is ${currentBuild.currentResult}", 
-                     //body:  "Jenkins build for the Job - ${env.JOB_NAME} is ${currentBuild.currentResult}. \n <br> More Info can be found here - ${env.BUILD_URL}", 
-                     //attachLog: false  
         }
-
         // # Executes below commands in JENKINS AGENT (DEPLOYMENT SERVER) if build success
         failure {
             // # Clean Workspace inside Jenkins Agent () if build fails.
-            cleanWs deleteDirs: true, disableDeferredWipeout: false, notFailBuild: true
-
             script {
-                sh "rm -rf ${WDIR}"
-            }
-    
-            script {
-                if ("${TARGET_BRANCHH}" == "${BRANCHH}") {
-                    // # Sends out the notification to MSTeams channel about the build 
-                    office365ConnectorSend webhookUrl: "${WEBHOOK_URL}",
-                        color : "${COLOUR_FAILURE}",
-                        status: "${currentBuild.currentResult}",
-                        message: "Sonar Code Scanning for the project - ${env.JOB_NAME} is failure. For additional information, check here to check the log - (<${env.BUILD_URL}|Open>)"
+                withCredentials([                    
+                    string(credentialsId: 'WEBHOOK_MSTEAMS_CICD_CHANNEL', variable: 'WEBHOOK_MSTEAMS_CICD_CHANNEL'),
+                    string(credentialsId: 'MSTEAMS_NOTIFICATION_CICD_PR_COLOUR_CODE_FAILURE', variable: 'MSTEAMS_NOTIFICATION_CICD_PR_COLOUR_CODE_FAILURE')
+                ]) {
+                    // Define allowed branches in a script block
+                    def allowedBranches = ['main', 'master', 'staging', 'stage']
+                    //def allowedBranches = ['main', 'master', 'staging', 'stage', 'development', 'develop']
+                    echo "Checking target branch: ${PR_TARGET_BRANCH}"
+                    echo "Allowed branches: ${BRANCHES}"
+                    // Only send failure notification if the branch is allowed
+                    if (allowedBranches.contains(PR_TARGET_BRANCH)) {
+                        if ("${SEND_MSTEAMS_NOTIFICATIONS}" == '1') {
+                            office365ConnectorSend(
+                                webhookUrl: "$WEBHOOK_MSTEAMS_CICD_CHANNEL",
+                                color: "$MSTEAMS_NOTIFICATION_CICD_PR_COLOUR_CODE_FAILURE",
+                                status: "${currentBuild.currentResult}",
+                                message: "SonarQube analysis for ${env.JOB_NAME} failed. Check the logs here: <${env.BUILD_URL}|Open>"
+                            )
+                        } else {
+                            echo "MS-TEAMS notification is disabled, Notification on FAILURE is not sent to MS-Teams (CICD Notifications Channel)"
+                        }
+                    } else {
+                        echo "Skipping Teams notification due to branch mismatch."
                     }
-                else {
-                    sh 'echo "Teams Notification cannot not be sent as PR target branch mismatch"'
                 }
             }
-            
-            // # Sends out the notification through e-mails about the build
-            //emailext to: 'ananda.yashaswi@quokkalabs.com, prem.shankar@quokkalabs.com, shashank.tripathi@quokkalabs.com, nisha.rana@quokkalabs.com',
-                     // to: 'ananda.yashaswi@quokkalabs.com, automation@quokkalabs.com',                     
-                     // recipientProviders: [buildUser(), contributor(), culprits(), previous(), developers(), requestor(), brokenBuildSuspects(), brokenTestsSuspects(), upstreamDevelopers()],
-                     //subject: "Jenkins build for ${env.JOB_NAME} is ${currentBuild.currentResult}", 
-                     //body: "Jenkins build for the Job - ${env.JOB_NAME} is ${currentBuild.currentResult}. \n <br> More Info can be found here - ${env.BUILD_URL}", 
-                     //attachLog: true
-       } 
+        }
+        // # Executes below commands in JENKINS AGENT (DEPLOYMENT SERVER) always.
+        always {
+            // # Clean Workspace inside Jenkins Agent () if build fails.
+            cleanWs()
+            script {
+                sh "rm -rf ${WS_DIR}"
+            }
+        } 
     }
-}
-
-def targetbrachconfirm() {
-    //def sourceBranch = env.CHANGE_SOURCE // Source branch of the pull request
-    def targetBranch = env.CHANGE_TARGET // Target branch of the pull request
-
-    // Check if the pull request is coming from 'source-branch' to 'target-branch'
-    //return sourceBranch == 'source-branch' && targetBranch == 'target-branch'
-    if (targetBranch == "development") {   
-        return targetBranch == "development"
-    }
-
-    else if (targetBranch == "staging") {
-        return targetBranch == "staging"
-    }    
-    
-    else {
-        //return "Other Branches";
-    }
-        
 }

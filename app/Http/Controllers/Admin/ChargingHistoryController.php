@@ -95,9 +95,9 @@ class ChargingHistoryController extends Controller
     if ($startDate && $endDate) {
             $sdate = (new \DateTime($startDate))->format('d-m-Y');
             $edate = (new \DateTime($endDate))->format('d-m-Y');
-            $filename = "transactions_{$sdate}_to_{$edate}.csv";
+            $filename = "charging-history-details_{$sdate}_to_{$edate}.csv";
         } else {
-            $filename = "transactions_all.csv";
+            $filename = "charging-history-details_all.csv";
         }
 
         return Excel::download(new CentralExport($data, $header), $filename);
