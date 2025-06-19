@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ChargingHistoryController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\UserController;
@@ -45,6 +46,18 @@ Route::get('/download-unavailable-charger-data', [AdminChargerController::class,
 Route::get('/download-available-charger-data', [AdminChargerController::class, 'availableChargerExport']);
 Route::get('/download-busy-charger-data', [AdminChargerController::class, 'busyChargerExport']);
 
+// User transaction download route 
+Route::get('/download-user-transactions/{userId}', [UserController::class, 'userTransactionExport']);
+
+// All User transaction download route
+Route::get('/download-all-user-transactions-data/{startDate?}/{endDate?}', [UserController::class, 'allUserTransactionExport']);
+
+
+
+// Download Charging history data
+Route::get('/download-charging-history-data/{startDate?}/{endDate?}', [ChargingHistoryController::class,'allChargingHistoryExport']);
+
+// Download Wallet Histories Data
 
 Route::get('/phone-pay',[PhonePayController::class, 'getWebView']);
 Route::get('/phonepay-process',[PhonePayController::class,'phonePayProcess'])->name('payment-process');

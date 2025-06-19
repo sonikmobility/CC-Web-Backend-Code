@@ -25,7 +25,7 @@ class VersionController extends Controller
         $item = (object) [];
         $item = $this->versionService->getVersion(['status' => 1]);
         $code = config('constant.SUCCESS');
-        $msg = "Available version";
+        $msg = "Available version -- ";
         return response(array('code' => $code, 'msg' => $msg, 'result' => $item));
     }
 

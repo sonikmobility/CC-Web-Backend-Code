@@ -305,7 +305,8 @@ class UserController extends Controller
      *
      * @throws MissingAbilityException
      */
-    public function add(Request $request){
+    public function add(Request $request)
+    {
         $item = (object) [];
         $code = config('constant.UNSUCCESS');
         $user = auth()->user();
@@ -320,7 +321,7 @@ class UserController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['code' => config('constant.UNSUCCESS'), 'msg' => $validator->errors()->first()]);
-        } else{
+        } else {
             try {
                 $role = isset($request->role) ? 1 : 2;
                 $status = $request->status != "undefined" ? $request->status : 1;
@@ -337,7 +338,7 @@ class UserController extends Controller
                         $data = $request->only('email', 'first_name', 'last_name', 'mobile_number') + ['status' => $status];
                     }
                     $item = $this->userService->Store($data);
-                    
+
                     // add roles
                     $defaultRoleSlug = config('hydra.default_user_role_slug', 'user');
                     $item->roles()->attach(Role::where('slug', $defaultRoleSlug)->first());
@@ -346,11 +347,11 @@ class UserController extends Controller
                     $item->profile_image = $item->profile_image_path . $item->profile_image;
                     $code = config('constant.SUCCESS');
                     $msg = 'Profile Add successfully';
-                }else{
+                } else {
                     $msg = "User not found";
                 }
                 return response(array('code' => $code, 'msg' => $msg, 'result' => $item));
-            }catch(Exception $e){
+            } catch (Exception $e) {
                 return response(array('code' => $code, 'msg' => $msg, 'result' => $e->getMessage()));
             }
         }
@@ -396,14 +397,14 @@ class UserController extends Controller
                         $data = $request->only('email', 'first_name', 'last_name', 'mobile_number') + ['status' => $status];
                     }
                     $item = $this->userService->updateUser($check_user->id, $data);
-                    if(!blank($request->settings)){
+                    if (!blank($request->settings)) {
                         $settings = json_decode($request->settings);
-                        foreach($settings as $key => $value){
+                        foreach ($settings as $key => $value) {
                             // $data = [
                             //     'name' => $key,
                             //     'updated_value' => $value,
                             // ];
-                            Setting::updateOrCreate(['name' => $key],['updated_value' => ($value == "" ? 0 : $value)]);
+                            Setting::updateOrCreate(['name' => $key], ['updated_value' => ($value == "" ? 0 : $value)]);
                         }
                     }
                     $item->profile_image = $item->profile_image_path . $item->profile_image;
@@ -429,7 +430,8 @@ class UserController extends Controller
         return response(array('code' => config('constant.SUCCESS'), 'msg' => 'UserListing', 'result' => $item));
     }
 
-    public function getAllUser(Request $request){
+    public function getAllUser(Request $request)
+    {
         $users = $this->userService->getAllUser();
         return response(array('code' => config('constant.SUCCESS'), 'msg' => 'User', 'result' => $users));
     }
@@ -536,7 +538,7 @@ class UserController extends Controller
             return response()->json(['code' => config('constant.UNSUCCESS'), 'msg' => $validator->errors()->first()]);
         } else {
             $this->commonService->deleteImage($request->file, 'User');
-            $user = $this->userService->getUser(['profile_image' => $request->file, 'id' =>  base64_decode($request->id)])->first();
+            $user = $this->userService->getUser(['profile_image' => $request->file, 'id' => base64_decode($request->id)])->first();
             if ($user) {
                 $user->profile_image = "";
                 $user->save();
@@ -577,7 +579,7 @@ class UserController extends Controller
         } else {
             $user = auth()->user();
             $this->commonService->deleteImage($request->file, 'Admin');
-            $user = $this->userService->getUser(['profile_image' => $request->file, 'id' =>  base64_decode($user->id)])->first();
+            $user = $this->userService->getUser(['profile_image' => $request->file, 'id' => base64_decode($user->id)])->first();
             if ($user) {
                 $user->profile_image = "";
                 $user->save();
@@ -662,4 +664,33 @@ class UserController extends Controller
         $export_data = $this->exportService->usersExport();
         return Excel::download(new CentralExport($export_data['data'], $export_data['header']), 'users.csv');
     }
+    public function userTransactionExport(Request $request, $user_id)
+    {
+        // $userName = User::selectRaw('users.first_name,users.last_name')->where('id', $user_id)->get();
+        $userName = User::select('first_name', 'last_name')
+            ->where('id', $user_id)
+            ->first();
+
+        if ($userName) {
+            $fullName = $userName->first_name . '_' . $userName->last_name;
+            // $fullName now contains "firstname lastname"
+        }
+        $export_data = $this->exportService->userTransactionsExport($user_id);
+        return Excel::download(new CentralExport($export_data['data'], $export_data['header']), 'wallet-' . $fullName . '.csv');
+    }
+    public function allUserTransactionExport(Request $request, $startDate = null, $endDate = null)
+    {
+        $export_data = $this->exportService->allUserTransactionsExport($startDate, $endDate);
+
+        if ($startDate && $endDate) {
+            $sdate = (new \DateTime($startDate))->format('d-m-Y');
+            $edate = (new \DateTime($endDate))->format('d-m-Y');
+            $filename = "transactions_{$sdate}_to_{$edate}.csv";
+        } else {
+            $filename = "transactions_all.csv";
+        }
+
+        return Excel::download(new CentralExport($export_data['data'], $export_data['header']), $filename);
+    }
+
 }
