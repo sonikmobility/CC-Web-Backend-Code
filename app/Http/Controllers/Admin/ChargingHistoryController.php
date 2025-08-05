@@ -56,7 +56,7 @@ class ChargingHistoryController extends Controller
                       CONCAT(users.first_name, ' ', users.last_name) as user_name,
                       charging_history.charging_unit,
                       charging_history.charged_value,
-                      charging_history.amount,
+                      charging_history.total_amount,
                       charging_history.created_at")
         ->join('chargers', 'chargers.id', '=', 'charging_history.charger_station_id')
         ->join('users', 'users.id', '=', 'charging_history.user_id');
@@ -84,7 +84,7 @@ class ChargingHistoryController extends Controller
             'charger_station_id' => $item->charger_station_id,
             'station_name' => $item->station_name,
             'charging_unit' => $item->charging_unit,
-            'amount' => $item->amount,
+            'amount' => $item->total_amount,
             'created_date' => $item->created_date,
             'created_time' => $item->created_time,
         ];

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Http\Models\Charger;
 use App\Http\Models\Booking;
+use App\Http\Models\WalletHistory;
+use App\Http\Models\ChargingHistory;
 use App\Http\Models\User;
 use Carbon\Carbon;
 use App\Http\Models\UserRole;
@@ -150,6 +152,9 @@ class DashboardController extends Controller
                                         ->join('charging_history','bookings.id','charging_history.booking_id')
                                         ->sum('charging_history.total_amount');
 
+        $total_wallet_credit = WalletHistory::where('type', 'credit')->sum('amount');
+        $total_charging_history_amount = ChargingHistory::whereNotNull('total_amount')->sum('total_amount');
+
         $total_final_payments += $total_ocpp_payments;
 
         $data = [
@@ -168,7 +173,9 @@ class DashboardController extends Controller
             'today_booking_data' => $get_today_bookings,
             'today_charger_data' => $get_today_chargers,
             'total_pre_auth_payment' => number_format($total_pre_auth_payments,2),
-            'total_final_payment' => number_format($total_final_payments,2)
+            'total_final_payment' => number_format($total_final_payments,2),
+            'total_wallet_credit'=>number_format($total_wallet_credit,2),
+            'total_charging_history_amount'=>number_format($total_charging_history_amount,2),
         ];
         return $data;
     }
