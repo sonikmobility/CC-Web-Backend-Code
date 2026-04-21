@@ -20,7 +20,7 @@ class ChargingHistoryService
 	{
 		// Update Charger status (Available to Busy)
 		$charger_status_data = [
-			'status' => '2',
+			'status' => '0',
 		];
 		$this->charger_service->updateCharger($data['charger_station_id'], $charger_status_data);
 	

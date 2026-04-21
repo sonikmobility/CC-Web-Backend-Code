@@ -654,10 +654,12 @@ class BookingController extends Controller
                                                 $code = config('constant.SUCCESS');
                                                 $msg = "Wallet Data";
                                                 $charger_Wallet = ChargerWallet::where('user_id',$user_id)->first();
+                                                $total_amount = $charger_Wallet->amount + $charger_Wallet->cashback_amount + $charger_Wallet->fixed_amount;
                                                 $get_setting_amount = Setting::where('name','minimum_wallet_charging_amount')->first();
-                                                if(!blank($get_setting_amount) && $charger_Wallet->amount < $get_setting_amount->updated_value){
+                                                $minimum_amount = $get_setting_amount->updated_value - $charger_Wallet->fixed_amount;
+                                                if(!blank($get_setting_amount) && $total_amount < $get_setting_amount->updated_value){
                                                     $code = 215;
-                                                    $msg = "Minimum ".$get_setting_amount->updated_value." Rs required in your wallet balance for the charging";
+                                                    $msg = "Minimum ".$minimum_amount." Rs required in your wallet balance for the charging";
                                                     $success = false;
                                                     $result['user_booking'] = false;
                                                     $result['allow_charging'] = false;

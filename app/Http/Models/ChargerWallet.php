@@ -17,6 +17,8 @@ class ChargerWallet extends Model
     protected $fillable = [
         'user_id',
         'amount',
+        'cashback_amount',
+        'fixed_amount',
     ];
 
     public function users()
